@@ -1,0 +1,70 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8sforbiddedpriviledgedcontainers
+  annotations:
+    description: >-
+      Controls the ability of any container to enable privileged mode.
+      Corresponds to the `privileged` field in a PodSecurityPolicy. For more
+      information, see
+      https://kubernetes.io/docs/concepts/policy/pod-security-policy/#privileged
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8SForbiddedPriviledgedContainers
+      validation:
+        openAPIV3Schema:
+          description: >-
+            Controls the ability of any container to enable privileged mode.
+            Corresponds to the `privileged` field in a PodSecurityPolicy. For more
+            information, see
+            https://kubernetes.io/docs/concepts/policy/pod-security-policy/#privileged
+          properties:
+            message:
+              type: string
+            labels:
+              type: array
+              items:
+                type: object
+                properties:
+                  allowedKey:
+                    type: string
+                  allowedValue:
+                    type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sforbiddedpriviledgedcontainers
+
+        violation[{"msg": msg, "details": {}}] {
+            expected := input.parameters.labels[_]
+
+            expected.allowedKey != ""
+            not has_key(input.review.object.metadata.labels, expected.allowedKey)
+            c := input_containers[_]
+            c.securityContext.privileged
+
+            msg := sprintf("Privileged container is not allowed: %v, securityContext: %v", [c.name, c.securityContext])
+        }
+
+        violation[{"msg": msg, "details": {}}] {
+            expected := input.parameters.labels[_]
+
+            expected.allowedKey != ""
+            has_key(input.review.object.metadata.labels, expected.allowedKey)
+            value := input.review.object.metadata.labels[expected.allowedKey]
+            value != expected.allowedValue
+            c := input_containers[_]
+            c.securityContext.privileged
+
+            msg := sprintf("Privileged container is not allowed: %v, securityContext: %v", [c.name, c.securityContext])
+        }
+
+        input_containers[c] {
+            c := input.review.object.spec.containers[_]
+        }
+        input_containers[c] {
+            c := input.review.object.spec.initContainers[_]
+        }
+        has_key(x, k) { _ = x[k] }
