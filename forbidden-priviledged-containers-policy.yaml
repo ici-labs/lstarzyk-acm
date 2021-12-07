@@ -1,0 +1,18 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8SForbiddedPriviledgedContainers
+metadata:
+  name: forbidden-privileged-container
+spec:
+  match:
+    excludedNamespaces:
+    - kube-system
+#    - test-ns
+    kinds:
+    - apiGroups:
+      - ""
+      kinds:
+      - Pod
+  parameters:
+    labels:
+      - allowedKey: allowed
+        allowedValue: pod
